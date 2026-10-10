@@ -1,8 +1,11 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.request.LoginRequest;
 import com.example.backend.dto.request.SignupRequest;
+import com.example.backend.dto.response.LoginResponse;
 import com.example.backend.dto.response.SignupResponse;
 import com.example.backend.entity.User;
+import com.example.backend.jwt.JwtProvider;
 import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -48,6 +52,45 @@ public class AuthService {
                 savedUser.getUserId(),
                 savedUser.getEmail(),
                 savedUser.getNickname()
+        );
+    }
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "가입되지 않은 이메일입니다."
+                ));
+
+        if (user.getPasswordHash() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "일반 로그인을 사용할 수 없는 계정입니다."
+            );
+        }
+
+        if (!passwordEncoder.matches(
+                request.password(),
+                user.getPasswordHash()
+        )) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "비밀번호가 일치하지 않습니다."
+            );
+        }
+
+        // JWT 생성
+        String accessToken = jwtProvider.createAccessToken(
+                user.getUserId(),
+                user.getEmail()
+        );
+
+        return new LoginResponse(
+                user.getUserId(),
+                user.getEmail(),
+                user.getNickname(),
+                accessToken
         );
     }
 }
