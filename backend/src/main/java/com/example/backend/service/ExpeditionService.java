@@ -1,8 +1,11 @@
 package com.example.backend.service;
 
+import com.example.backend.domain.ExpeditionStatus;
 import com.example.backend.domain.MemberRole;
 import com.example.backend.dto.request.ExpeditionCreateRequest;
+import com.example.backend.dto.request.ExpeditionJoinRequest;
 import com.example.backend.dto.response.ExpeditionCreateResponse;
+import com.example.backend.dto.response.ExpeditionJoinResponse;
 import com.example.backend.entity.Expedition;
 import com.example.backend.entity.ExpeditionMember;
 import com.example.backend.entity.User;
@@ -117,5 +120,73 @@ public class ExpeditionService {
         } while (expeditionRepository.existsByInviteCode(inviteCode));
 
         return inviteCode;
+    }
+    //원정코드 초대
+    @Transactional
+    public ExpeditionJoinResponse joinExpedition(
+            Long userId,
+            ExpeditionJoinRequest request
+    ) {
+
+        // 1. 로그인 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "사용자 정보를 찾을 수 없습니다."
+                ));
+
+        // 2. 입력된 초대코드 정리
+        String inviteCode =
+                request.inviteCode().trim().toUpperCase();
+
+        // 3. 초대코드로 원정 조회
+        Expedition expedition =
+                expeditionRepository.findByInviteCode(inviteCode)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.BAD_REQUEST,
+                                "존재하지 않는 초대코드입니다."
+                        ));
+
+        // 4. 완료 또는 취소된 원정인지 확인
+        if (expedition.getStatus() == ExpeditionStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "이미 완료된 원정입니다."
+            );
+        }
+
+        if (expedition.getStatus() == ExpeditionStatus.CANCELED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "취소된 원정입니다."
+            );
+        }
+
+        // 5. 이미 참가한 사람인지 확인
+        if (expeditionMemberRepository
+                .existsByExpeditionAndUser(expedition, user)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "이미 참가한 원정입니다."
+            );
+        }
+
+        // 6. MEMBER로 참가
+        ExpeditionMember member =
+                new ExpeditionMember(
+                        expedition,
+                        user,
+                        MemberRole.MEMBER
+                );
+
+        expeditionMemberRepository.save(member);
+
+        // 7. 응답
+        return new ExpeditionJoinResponse(
+                expedition.getExpeditionId(),
+                expedition.getTitle(),
+                MemberRole.MEMBER
+        );
     }
 }

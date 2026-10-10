@@ -1,7 +1,9 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.request.ExpeditionCreateRequest;
+import com.example.backend.dto.request.ExpeditionJoinRequest;
 import com.example.backend.dto.response.ExpeditionCreateResponse;
+import com.example.backend.dto.response.ExpeditionJoinResponse;
 import com.example.backend.service.ExpeditionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,5 +31,17 @@ public class ExpeditionController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+    //초대 코드로 원정참가
+    @PostMapping("/join")
+    public ResponseEntity<ExpeditionJoinResponse> joinExpedition(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody ExpeditionJoinRequest request
+    ) {
+
+        ExpeditionJoinResponse response =
+                expeditionService.joinExpedition(userId, request);
+
+        return ResponseEntity.ok(response);
     }
 }
