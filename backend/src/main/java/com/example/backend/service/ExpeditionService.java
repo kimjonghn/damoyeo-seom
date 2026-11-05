@@ -4,8 +4,7 @@ import com.example.backend.domain.ExpeditionStatus;
 import com.example.backend.domain.MemberRole;
 import com.example.backend.dto.request.ExpeditionCreateRequest;
 import com.example.backend.dto.request.ExpeditionJoinRequest;
-import com.example.backend.dto.response.ExpeditionCreateResponse;
-import com.example.backend.dto.response.ExpeditionJoinResponse;
+import com.example.backend.dto.response.*;
 import com.example.backend.entity.Expedition;
 import com.example.backend.entity.ExpeditionMember;
 import com.example.backend.entity.User;
@@ -19,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -187,6 +187,124 @@ public class ExpeditionService {
                 expedition.getExpeditionId(),
                 expedition.getTitle(),
                 MemberRole.MEMBER
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExpeditionMemberResponse> getExpeditionMembers(
+            Long userId,
+            Long expeditionId
+    ) {
+
+        // 1. 원정 존재 여부 확인
+        expeditionRepository.findById(expeditionId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "존재하지 않는 원정입니다."
+                ));
+
+        // 2. 로그인한 사용자가 해당 원정의 참가자인지 확인
+        boolean isMember =
+                expeditionMemberRepository
+                        .existsByExpedition_ExpeditionIdAndUser_UserId(
+                                expeditionId,
+                                userId
+                        );
+
+        if (!isMember) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "해당 원정의 참가자만 조회할 수 있습니다."
+            );
+        }
+
+        // 3. 원정 참가자 조회
+        List<ExpeditionMember> members =
+                expeditionMemberRepository
+                        .findAllByExpedition_ExpeditionIdOrderByJoinedAtAsc(
+                                expeditionId
+                        );
+
+        // 4. Entity -> Response DTO 변환
+        return members.stream()
+                .map(member -> new ExpeditionMemberResponse(
+                        member.getUser().getUserId(),
+                        member.getUser().getNickname(),
+                        member.getUser().getProfileImageUrl(),
+                        member.getRole(),
+                        member.getJoinedAt()
+                ))
+                .toList();
+    }
+
+    //내가 참가 중인 원정 목록조회
+    @Transactional(readOnly = true)
+    public List<MyExpeditionResponse> getMyExpeditions(Long userId) {
+
+        List<ExpeditionMember> memberships =
+                expeditionMemberRepository
+                        .findAllByUser_UserIdOrderByJoinedAtDesc(userId);
+
+        return memberships.stream()
+                .map(member -> {
+
+                    Expedition expedition =
+                            member.getExpedition();
+
+                    return new MyExpeditionResponse(
+                            expedition.getExpeditionId(),
+                            expedition.getTitle(),
+                            expedition.getStartDate(),
+                            expedition.getEndDate(),
+                            expedition.getDepartureLocation(),
+                            expedition.getStatus(),
+                            member.getRole()
+                    );
+                })
+                .toList();
+    }
+
+    //원정 상세 조회
+    @Transactional(readOnly = true)
+    public ExpeditionDetailResponse getExpeditionDetail(
+            Long userId,
+            Long expeditionId
+    ) {
+
+        // 1. 원정 존재 확인
+        Expedition expedition =
+                expeditionRepository.findById(expeditionId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "존재하지 않는 원정입니다."
+                        ));
+
+        // 2. 로그인 사용자가 해당 원정 참가자인지 확인
+        ExpeditionMember member =
+                expeditionMemberRepository
+                        .findByExpedition_ExpeditionIdAndUser_UserId(
+                                expeditionId,
+                                userId
+                        )
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.FORBIDDEN,
+                                "해당 원정의 참가자만 조회할 수 있습니다."
+                        ));
+
+        // 3. 상세 정보 반환
+        return new ExpeditionDetailResponse(
+                expedition.getExpeditionId(),
+                expedition.getTitle(),
+                expedition.getDescription(),
+                expedition.getStartDate(),
+                expedition.getEndDate(),
+                expedition.getDepartureLocation(),
+                expedition.getExpectedMemberCount(),
+                expedition.getVehicleCount(),
+                expedition.getInviteCode(),
+                expedition.getStatus(),
+                expedition.getSelectedCandidateId(),
+                member.getRole()
         );
     }
 }

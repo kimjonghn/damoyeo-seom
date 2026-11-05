@@ -49,7 +49,10 @@ public class SecurityConfig {
                         // 로그인 전 접근 가능
                         .requestMatchers(
                                 "/api/auth/signup",
-                                "/api/auth/login"
+                                "/api/auth/login",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**"
                         ).permitAll()
 
                         // 나머지는 JWT 인증 필요
