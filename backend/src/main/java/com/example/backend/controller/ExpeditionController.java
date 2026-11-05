@@ -1,5 +1,6 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.request.DestinationSelectRequest;
 import com.example.backend.dto.request.ExpeditionCreateRequest;
 import com.example.backend.dto.request.ExpeditionJoinRequest;
 import com.example.backend.dto.response.*;
@@ -83,6 +84,23 @@ public class ExpeditionController {
                 expeditionService.getExpeditionDetail(
                         userId,
                         expeditionId
+                );
+
+        return ResponseEntity.ok(response);
+    }
+    //최종 목적지 결정
+    @PatchMapping("/{expeditionId}/destination")
+    public ResponseEntity<DestinationSelectResponse> selectDestination(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long expeditionId,
+            @Valid @RequestBody DestinationSelectRequest request
+    ) {
+
+        DestinationSelectResponse response =
+                expeditionService.selectDestination(
+                        userId,
+                        expeditionId,
+                        request
                 );
 
         return ResponseEntity.ok(response);

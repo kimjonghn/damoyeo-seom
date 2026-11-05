@@ -55,6 +55,7 @@ public class Expedition {
     @Column(name = "selected_candidate_id")
     private Long selectedCandidateId;
 
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -82,5 +83,9 @@ public class Expedition {
         this.vehicleCount = vehicleCount;
         this.inviteCode = inviteCode;
         this.status = ExpeditionStatus.PLANNING;
+    }
+
+    public void selectCandidate(Long candidatePlaceId) {
+        this.selectedCandidateId = candidatePlaceId;
     }
 }

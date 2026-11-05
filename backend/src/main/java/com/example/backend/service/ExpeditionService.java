@@ -2,12 +2,15 @@ package com.example.backend.service;
 
 import com.example.backend.domain.ExpeditionStatus;
 import com.example.backend.domain.MemberRole;
+import com.example.backend.dto.request.DestinationSelectRequest;
 import com.example.backend.dto.request.ExpeditionCreateRequest;
 import com.example.backend.dto.request.ExpeditionJoinRequest;
 import com.example.backend.dto.response.*;
+import com.example.backend.entity.CandidatePlace;
 import com.example.backend.entity.Expedition;
 import com.example.backend.entity.ExpeditionMember;
 import com.example.backend.entity.User;
+import com.example.backend.repository.CandidatePlaceRepository;
 import com.example.backend.repository.ExpeditionMemberRepository;
 import com.example.backend.repository.ExpeditionRepository;
 import com.example.backend.repository.UserRepository;
@@ -32,7 +35,7 @@ public class ExpeditionService {
     private final ExpeditionRepository expeditionRepository;
     private final ExpeditionMemberRepository expeditionMemberRepository;
     private final UserRepository userRepository;
-
+    private final CandidatePlaceRepository candidatePlaceRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -305,6 +308,67 @@ public class ExpeditionService {
                 expedition.getStatus(),
                 expedition.getSelectedCandidateId(),
                 member.getRole()
+        );
+    }
+    //목적지 결정
+    @Transactional
+    public DestinationSelectResponse selectDestination(
+            Long userId,
+            Long expeditionId,
+            DestinationSelectRequest request
+    ) {
+
+        // 1. 원정 확인
+        Expedition expedition =
+                expeditionRepository.findById(expeditionId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "존재하지 않는 원정입니다."
+                        ));
+
+        // 2. 로그인 사용자가 해당 원정의 참가자인지 확인
+        ExpeditionMember member =
+                expeditionMemberRepository
+                        .findByExpedition_ExpeditionIdAndUser_UserId(
+                                expeditionId,
+                                userId
+                        )
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.FORBIDDEN,
+                                "해당 원정의 참가자가 아닙니다."
+                        ));
+
+        // 3. LEADER인지 확인
+        if (member.getRole() != MemberRole.LEADER) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "원정 리더만 최종 목적지를 결정할 수 있습니다."
+            );
+        }
+
+        // 4. 선택한 후보지가 이 원정에 속한 후보지인지 확인
+        CandidatePlace candidatePlace =
+                candidatePlaceRepository
+                        .findByCandidatePlaceIdAndExpedition_ExpeditionId(
+                                request.candidatePlaceId(),
+                                expeditionId
+                        )
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.BAD_REQUEST,
+                                "해당 원정에 존재하지 않는 후보지입니다."
+                        ));
+
+        // 5. 최종 목적지 저장
+        expedition.selectCandidate(
+                candidatePlace.getCandidatePlaceId()
+        );
+
+        // JPA 변경 감지로 자동 UPDATE됨
+
+        return new DestinationSelectResponse(
+                expedition.getExpeditionId(),
+                candidatePlace.getCandidatePlaceId(),
+                candidatePlace.getPlaceName()
         );
     }
 }
