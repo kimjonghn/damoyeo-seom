@@ -40,4 +40,8 @@ public interface ExpeditionMemberRepository
             Long expeditionId,
             Long userId
     );
+
+    long countByExpedition_ExpeditionId(
+            Long expeditionId
+    );
 }
